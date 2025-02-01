@@ -24,6 +24,7 @@ wheels/
 venv/
 ENV/
 env/
+env_blog_mmrag/
 .env
 
 # IDE
@@ -33,6 +34,13 @@ env/
 *.swo
 
 # Project specific
+.checkpoints/
+results/
+src_01/
+*_old.py
+imagebind_huge.pth
+
+# Manter arquivos de exemplo nos diretórios de dados
 data/images/*
 data/audios/*
 data/texts/*
@@ -41,3 +49,10 @@ data/depths/*
 !data/audios/README.md
 !data/texts/README.md
 !data/depths/README.md
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -2,8 +2,8 @@
 
 import unittest
 import numpy as np
-from src.elastic_manager import ElasticSearchManager
-from src.config import ELASTIC_CONFIG
+from src_01.elastic_manager import ElasticSearchManager
+from src_01.config import ELASTIC_CONFIG
 
 class TestElasticSearchManager(unittest.TestCase):
     @classmethod

@@ -1,29 +1,29 @@
-# src/embedding_generator.py
-
 import os
 import cv2
-import torch
-import numpy as np
-from PIL import Image
 from io import BytesIO
 import logging
 from torch.hub import download_url_to_file
 
-
+import torch
+import numpy as np
+from PIL import Image
 from imagebind import data
 from imagebind.models import imagebind_model
+
+from torchvision import transforms
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class EmbeddingGenerator:
-    def __init__(self, device=None):
-        """Initialize the EmbeddingGenerator with specified device."""
-        self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"Using device: {self.device}")
-        self.model = self._initialize_model()
-
-    def _initialize_model(self):
+    """Gera embeddings multimodais usando ImageBind"""
+    
+    def __init__(self, device="cpu"):
+        self.device = device
+        self.model = self._load_model()
+        
+    def _load_model(self):
         """Initialize and test the ImageBind model."""
         checkpoint_path = "~/.cache/torch/checkpoints/imagebind_huge.pth"
         os.makedirs(os.path.expanduser("~/.cache/torch/checkpoints"), exist_ok=True)
@@ -63,122 +63,79 @@ class EmbeddingGenerator:
             logger.error(f"🚨 Model initialization failed: {str(e)}")
             raise
 
-    def process_modality(self, content_path, modality):
-        """Process various modalities including video.
-        
-        Args:
-            content_path: Path to content file or text string
-            modality: One of ["vision", "audio", "text", "video", "depth"]
-            
-        Returns:
-            numpy.ndarray: Embedding vector for the content
-        """
-        if modality not in ["vision", "audio", "text", "video", "depth"]:
-            logger.warning(f"⚠️ Unsupported modality: '{modality}'")
-            return None
-
-        try:
-            if modality == "video":
-                return self._process_video(content_path)
-            else:
-                return self._process_with_imagebind(content_path, modality)
-        except Exception as e:
-            logger.error(f"⚡ Error processing {modality}: {str(e)}")
-            return None
-
-    def _process_with_imagebind(self, content_path, modality):
-        """Process content using ImageBind's built-in processors."""
+    
+    def generate_embedding_old(self, input_data, modality):
+        """Gera embedding para diferentes modalidades"""
         processors = {
-            "vision": data.load_and_transform_vision_data,
-            "audio": data.load_and_transform_audio_data,
-            "text": data.load_and_transform_text,
-            "depth": data.load_and_transform_vision_data
+            "vision": self.process_vision,
+            "audio": self.process_audio,
+            "text": self.process_text,
+            "depth": self.process_depth
         }
-
-        # Some modalities need CPU processing
-        processing_device = torch.device("cpu") if modality in ["audio", "vision", "depth"] else self.device
-        self.model = self.model.to(processing_device)
-
-        # Process the input
-        inputs = {modality: processors[modality]([content_path], processing_device)}
+        
+        if modality not in processors:
+            raise ValueError(f"Modalidade não suportada: {modality}")
+            
+        inputs = {modality: processors[modality](input_data)}
+        
         with torch.no_grad():
-            embeddings = self.model(inputs)
-        return embeddings[modality].cpu().numpy()[0]
-
-    def _process_video(self, video_path, num_frames=8):
-        """Process video by extracting frames and computing embeddings."""
-        if not os.path.exists(video_path):
-            logger.warning(f"⚠️ Video not found: {video_path}")
-            return None
-
-        cap = cv2.VideoCapture(video_path)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames <= 0:
-            logger.warning("⚠️ Could not read frames from video.")
-            return None
-
-        # Extract evenly spaced frames
-        frames_to_extract = min(num_frames, total_frames)
-        frame_indices = np.linspace(0, total_frames - 1, frames_to_extract).astype(int)
-        frame_embeddings = []
-
-        for idx in frame_indices:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            emb = self._frame_to_embedding(frame_rgb)
-            if emb is not None:
-                frame_embeddings.append(emb)
-
-        cap.release()
-
-        if not frame_embeddings:
-            logger.warning("⚠️ Could not extract video embeddings.")
-            return None
-
-        return np.mean(frame_embeddings, axis=0)
-
-    def _frame_to_embedding(self, rgb_frame):
-        """Convert a single video frame to embedding."""
-        pil_image = Image.fromarray(rgb_frame)
-        temp_buffer = BytesIO()
-        pil_image.save(temp_buffer, format='PNG')
-        temp_buffer.seek(0)
-
-        # Save temporary frame
-        temp_frame_path = "temp_frame.png"
-        with open(temp_frame_path, "wb") as f:
-            f.write(temp_buffer.getvalue())
-
-        # Process frame
-        emb = self._process_with_imagebind(temp_frame_path, "vision")
-
-        # Cleanup
+            embedding = self.model(inputs)[modality]
+        return embedding.squeeze(0).cpu().numpy()
+    
+    def generate_embedding(self, input_data, modality):
+        """Gera embedding para diferentes modalidades"""
+        processors = {
+            "vision": lambda x: data.load_and_transform_vision_data(x, self.device),
+            "audio": lambda x: data.load_and_transform_audio_data(x, self.device),
+            "text": lambda x: data.load_and_transform_text(x, self.device),
+            "depth": self.process_depth
+        }
+        
         try:
-            os.remove(temp_frame_path)
+            # Verificação de tipo de entrada
+            if not isinstance(input_data, list):
+                raise ValueError(f"Input data must be a list. Received: {type(input_data)}")
+                
+            inputs = {modality: processors[modality](input_data)}
+            with torch.no_grad():
+                embedding = self.model(inputs)[modality]
+            return embedding.squeeze(0).cpu().numpy()
         except Exception as e:
-            logger.warning(f"Could not remove temporary frame: {e}")
+            logger.error(f"Error generating {modality} embedding: {str(e)}", exc_info=True)
+            raise
+    
 
-        return emb
-
-# Test function
-def test_embedding_generator():
-    """Test the EmbeddingGenerator with various modalities."""
-    generator = EmbeddingGenerator()
-
-    # Test text embedding
-    text = "A dark night in Gotham City"
-    text_emb = generator.process_modality(text, "text")
-    logger.info(f"Text embedding shape: {text_emb.shape if text_emb is not None else 'Failed'}")
-
-    # Test image embedding if sample image exists
-    image_path = "data/images/crime_scene_1.jpg"
-    if os.path.exists(image_path):
-        image_emb = generator.process_modality(image_path, "vision")
-        logger.info(f"Image embedding shape: {image_emb.shape if image_emb is not None else 'Failed'}")
-
-if __name__ == "__main__":
-    test_embedding_generator()
+    def process_vision(self, image_path):
+        """Processa imagem"""
+        return data.load_and_transform_vision_data([image_path], self.device)
+    
+    def process_audio(self, audio_path):
+        """Processa áudio"""
+        return data.load_and_transform_audio_data([audio_path], self.device)
+    
+    def process_text(self, text):
+        """Processa texto"""
+        return data.load_and_transform_text([text], self.device)
+    
+    def process_depth(self, depth_paths, device="cpu"):
+        """Processamento customizado para depth maps"""
+        try:
+            print("p1:",depth_paths)
+            # Verificar existencia dos arquivos
+            for path in depth_paths:
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"Arquivo de depth map não encontrado: {path}")
+            
+            # Carregar e transformar
+            depth_images = [Image.open(path).convert("L") for path in depth_paths]
+            
+            transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+            ])
+            
+            return torch.stack([transform(img) for img in depth_images]).to(device)
+            
+        except Exception as e:
+            logger.error(f"🚨 Erro no processamento de depth map: {str(e)}")
+            raise

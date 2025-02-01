@@ -1,6 +1,6 @@
 # tests/test_config.py
 import unittest
-from src import config
+from src_01 import config
 
 class TestConfiguration(unittest.TestCase):
     """Test cases for configuration module."""

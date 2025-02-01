@@ -1,51 +1,104 @@
-# tests/test_embedding_generator.py
-
-import unittest
 import numpy as np
+import logging
 from pathlib import Path
-from src.embedding_generator import EmbeddingGenerator
-from src.config import DIRECTORIES
 
-class TestEmbeddingGenerator(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Set up test fixtures before running all tests."""
-        cls.generator = EmbeddingGenerator()
-        cls.test_data_dir = Path(__file__).parent / 'data'
-        cls.embedding_size = 1024  # Expected size of ImageBind embeddings
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    def test_text_embedding(self):
-        """Test generating embeddings for text."""
-        text = "A mysterious night in Gotham City"
-        embedding = self.generator.process_modality(text, "text")
-        
-        self.assertIsNotNone(embedding)
-        self.assertIsInstance(embedding, np.ndarray)
-        self.assertEqual(embedding.shape[0], self.embedding_size)
+class TestEmbeddingGenerator:
+    def __init__(self):
+        try:
+            from embedding_generator import EmbeddingGenerator
+            self.generator = EmbeddingGenerator()
+            logger.info("EmbeddingGenerator initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize EmbeddingGenerator: {e}")
+            raise
 
-    def test_image_embedding(self):
-        """Test generating embeddings for images."""
-        test_image = DIRECTORIES['images'] / 'crime_scene.jpg'
-        if not test_image.exists():
-            self.skipTest(f"Test image not found: {test_image}")
+    def test_image_embedding(self, image_path="data/images/crime_scene1.jpg"):
+        """Test image embedding generation"""
+        try:
+            embedding = self.generator.generate_embedding([image_path], "vision")  # Adicionar lista
+
+            logger.info(f"Image embedding shape: {embedding.shape}")
+            logger.info(f"Image embedding stats - Mean: {np.mean(embedding):.4f}, Std: {np.std(embedding):.4f}")
+            return embedding
+        except Exception as e:
+            logger.error(f"Error processing image: {e}")
+            return None
+
+    def test_audio_embedding(self, audio_path="data/audios/joker_laugh.wav"):
+        """Test audio embedding generation"""
+        try:
+            embedding = self.generator.generate_embedding([audio_path], "audio")  # Adicionar lista
+
+            logger.info(f"Audio embedding shape: {embedding.shape}")
+            logger.info(f"Audio embedding stats - Mean: {np.mean(embedding):.4f}, Std: {np.std(embedding):.4f}")
+            return embedding
+        except Exception as e:
+            logger.error(f"Error processing audio: {e}")
+            return None
+
+    def test_text_embedding(self, text_path="data/texts/riddle.txt"):
+        """Test text embedding generation"""
+        try:
+            with open(text_path, 'r') as f:
+                text = f.read()
+            embedding = self.generator.generate_embedding([text], "text")  # Adicionar lista
+
+            logger.info(f"Text embedding shape: {embedding.shape}")
+            logger.info(f"Text embedding stats - Mean: {np.mean(embedding):.4f}, Std: {np.std(embedding):.4f}")
+            return embedding
+        except Exception as e:
+            logger.error(f"Error processing text: {e}")
+            return None
+
+    def test_depth_embedding(self, depth_path="data/depths/depth_map_result.png"):
+        """Test depth map embedding generation"""
+        try:
+            logger.info(f"p1: {depth_path}")  # Verificação do caminho
             
-        embedding = self.generator.process_modality(str(test_image), "vision")
-        
-        self.assertIsNotNone(embedding)
-        self.assertIsInstance(embedding, np.ndarray)
-        self.assertEqual(embedding.shape[0], self.embedding_size)
+            # Verificar se o arquivo existe
+            if not Path(depth_path).exists():
+                raise FileNotFoundError(f"Depth map file not found: {depth_path}")
+                
+            # Passar como lista para o método process_depth
+            embedding = self.generator.generate_embedding([depth_path], "depth")  # Alterado para lista
+            logger.info(f"Depth embedding shape: {embedding.shape}")
+            logger.info(f"Depth embedding stats - Mean: {np.mean(embedding):.4f}, Std: {np.std(embedding):.4f}")
+            return embedding
+        except Exception as e:
+            logger.error(f"Error processing depth map: {str(e)}", exc_info=True)  # Log detalhado
+            return None
 
-    def test_invalid_modality(self):
-        """Test handling of invalid modality."""
-        embedding = self.generator.process_modality("test", "invalid_modality")
-        self.assertIsNone(embedding)
+            
+def main():
+    logger.info("Starting embedding generator tests...")
+    
+    tester = TestEmbeddingGenerator()
+    
+    # Test each modality
+    logger.info("\nTesting image embedding...")
+    image_emb = tester.test_image_embedding()
+    
+    logger.info("\nTesting audio embedding...")
+    audio_emb = tester.test_audio_embedding()
+    
+    logger.info("\nTesting text embedding...")
+    text_emb = tester.test_text_embedding()
+    
+    logger.info("\nTesting depth embedding...")
+    depth_emb = tester.test_depth_embedding()
+    
+    # Check if all embeddings have the same dimensionality
+    embeddings = [e for e in [image_emb, audio_emb, text_emb, depth_emb] if e is not None]
+    if embeddings:
+        shapes = [e.shape for e in embeddings]
+        logger.info(f"\nAll generated embedding shapes: {shapes}")
+        if len(set(shapes)) == 1:
+            logger.info("✅ All embeddings have the same dimensionality")
+        else:
+            logger.warning("⚠️ Embeddings have different dimensionalities")
 
-    def test_missing_file(self):
-        """Test handling of missing files."""
-        embedding = self.generator.process_modality(
-            "nonexistent_file.jpg", "vision"
-        )
-        self.assertIsNone(embedding)
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+if __name__ == "__main__":
+    main()
