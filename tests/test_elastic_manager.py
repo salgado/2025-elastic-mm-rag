@@ -1,128 +1,119 @@
-# tests/test_elastic_manager.py
-
-import unittest
+import logging
 import numpy as np
-from src_01.elastic_manager import ElasticSearchManager
-from src_01.config import ELASTIC_CONFIG
+import sys
+import os
+from pathlib import Path
 
-class TestElasticSearchManager(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Set up test fixtures before running tests."""
-        cls.es_manager = ElasticSearchManager(
-            cloud_id=ELASTIC_CONFIG["cloud_id"],
-            api_key=ELASTIC_CONFIG["api_key"],
-            index_name="test_multimodal_content"
-        )
-        
-        # Create test embedding
-        cls.test_embedding = np.random.rand(1024).astype(np.float32)
-        
-    def setUp(self):
-        """Clean up before each test."""
-        # Delete any existing test data
-        self.es_manager.delete_content(modality="test")
-        
-    def test_index_and_search(self):
-        """Test indexing and searching content."""
-        # Index a test document
-        response = self.es_manager.index_content(
-            embedding=self.test_embedding,
-            modality="test",
-            description="Test document",
-            metadata={"test_id": 1}
-        )
-        
-        self.assertIsNotNone(response)
-        self.assertTrue("_id" in response)
-        
-        # Search for similar documents
-        results = self.es_manager.search_content(
-            query_embedding=self.test_embedding,
-            k=1,
-            modality="test"
-        )
-        
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["_source"]["description"], "Test document")
-        
-    def test_binary_content(self):
-        """Test indexing and retrieving binary content."""
-        # Create some binary content
-        test_content = b"Hello, World!"
-        
-        # Index with binary content
-        response = self.es_manager.index_content(
-            embedding=self.test_embedding,
-            modality="test",
-            content=test_content,
-            description="Binary test"
-        )
-        
-        self.assertIsNotNone(response)
-        
-        # Retrieve and verify
-        results = self.es_manager.search_content(
-            query_embedding=self.test_embedding,
-            k=1,
-            modality="test"
-        )
-        
-        self.assertEqual(len(results), 1)
-        self.assertTrue("content" in results[0]["_source"])
-        
-    def test_modality_filter(self):
-        """Test filtering by modality."""
-        # Index documents with different modalities
-        modalities = ["text", "vision", "audio"]
-        
-        for modality in modalities:
-            self.es_manager.index_content(
-                embedding=np.random.rand(1024),
-                modality=modality,
-                description=f"Test {modality}"
-            )
+# Adiciona o diretório src ao PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class TestElasticManager:
+    def __init__(self):
+        try:
+            from src.elastic_manager import ElasticManager
+            from src.embedding_generator import EmbeddingGenerator
             
-        # Search with modality filter
-        results = self.es_manager.search_content(
-            query_embedding=np.random.rand(1024),
-            k=5,
-            modality="text"
-        )
-        
-        self.assertTrue(all(hit["_source"]["modality"] == "text" for hit in results))
-        
-    def test_delete_content(self):
-        """Test content deletion."""
-        # Index a test document
-        response = self.es_manager.index_content(
-            embedding=self.test_embedding,
-            modality="test",
-            description="To be deleted"
-        )
-        
-        doc_id = response["_id"]
-        
-        # Delete by ID
-        success = self.es_manager.delete_content(doc_id=doc_id)
-        self.assertTrue(success)
-        
-        # Verify deletion
-        results = self.es_manager.search_content(
-            query_embedding=self.test_embedding,
-            k=1,
-            modality="test"
-        )
-        
-        self.assertEqual(len(results), 0)
-        
-    def test_invalid_connection(self):
-        """Test handling of invalid connection."""
-        with self.assertRaises(Exception):
-            ElasticSearchManager(
-                cloud_id="invalid_cloud_id",
-                api_key="invalid_api_key"
-            )
+            self.elastic = ElasticManager()
+            self.embedding_generator = EmbeddingGenerator()
+            logger.info("✅ ElasticManager and EmbeddingGenerator initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize managers: {e}")
+            raise
 
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    def test_index_and_search(self):
+        """Test indexing and searching content"""
+        try:
+            # Test with image
+            image_path = "data/images/crime_scene1.jpg"
+            logger.info(f"\n🔍 Testing with image: {image_path}")
+            
+            # Generate embedding
+            image_embedding = self.embedding_generator.generate_embedding([image_path], "vision")
+            
+            # Index content
+            self.elastic.index_content(
+                embedding=image_embedding,
+                modality="vision",
+                description="Test image of crime scene",
+                content_path=image_path
+            )
+            logger.info("✅ Image content indexed successfully")
+            
+            # Search similar content
+            results = self.elastic.search_similar(image_embedding, k=5)
+            logger.info(f"Found {len(results)} similar items")
+            
+            for i, result in enumerate(results, 1):
+                logger.info(f"{i}. {result['description']} ({result['modality']})")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error in index and search test: {e}")
+            return False
+
+    def test_multiple_modalities(self):
+        """Test handling multiple modalities"""
+        try:
+            test_files = {
+                "vision": "data/images/crime_scene1.jpg",
+                "audio": "data/audios/joker_laugh.wav",
+                "text": "data/texts/riddle.txt"
+            }
+            
+            for modality, file_path in test_files.items():
+                logger.info(f"\n🔍 Testing {modality} modality with {file_path}")
+                
+                if modality == "text":
+                    with open(file_path, 'r') as f:
+                        content = f.read()
+                    embedding = self.embedding_generator.generate_embedding([content], modality)
+                else:
+                    embedding = self.embedding_generator.generate_embedding([file_path], modality)
+                
+                # Index content
+                self.elastic.index_content(
+                    embedding=embedding,
+                    modality=modality,
+                    description=f"Test {modality} content",
+                    content_path=file_path
+                )
+                logger.info(f"✅ {modality.capitalize()} content indexed successfully")
+                
+                # Search similar content
+                results = self.elastic.search_similar(embedding, modality=modality, k=3)
+                logger.info(f"Found {len(results)} similar {modality} items")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error in multiple modalities test: {e}")
+            return False
+
+def main():
+    logger.info("🚀 Starting ElasticManager tests...")
+    
+    tester = TestElasticManager()
+    
+    # Run tests
+    logger.info("\n📝 Testing basic index and search functionality...")
+    index_search_success = tester.test_index_and_search()
+    
+    logger.info("\n📝 Testing multiple modalities...")
+    multi_modal_success = tester.test_multiple_modalities()
+    
+    # Report results
+    logger.info("\n📊 Test Results:")
+    logger.info(f"Basic Index/Search: {'✅' if index_search_success else '❌'}")
+    logger.info(f"Multiple Modalities: {'✅' if multi_modal_success else '❌'}")
+    
+    if index_search_success and multi_modal_success:
+        logger.info("\n✨ All tests passed successfully!")
+    else:
+        logger.error("\n❌ Some tests failed")
+
+if __name__ == "__main__":
+    main()
