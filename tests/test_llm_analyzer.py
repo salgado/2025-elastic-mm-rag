@@ -34,7 +34,7 @@ class TestLLMAnalyzer:
                 'vision': 'data/images/crime_scene1.jpg',
                 'audio': 'data/audios/joker_laugh.wav',
                 'text': 'Why so serious?',
-                'depth': 'data/depths/suspect_depth.jpg'
+                'depth': 'data/depths/depth_map_result.png'
             }
             
             logger.info("🔍 Collecting evidence...")
