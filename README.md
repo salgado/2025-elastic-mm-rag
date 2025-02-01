@@ -129,7 +129,6 @@ This project is licensed under the MIT License.
 
 For questions and support:
 1. Open an issue on GitHub
-2. Send an email to [your-email]
 
 ## 🔗 Useful Links
 
