@@ -30,7 +30,7 @@ class LLMAnalyzer:
         evidence_summary = self._format_evidence(evidence_results)
 
         # final prompt
-        prompt_01 = f"""
+        prompt = f"""
 You are a highly experienced forensic detective specializing in multimodal evidence analysis. Your task is to analyze the collected evidence (audio, images, text, depth maps) and conclusively determine the **prime suspect** responsible for the Gotham Central Bank case.
 
 ---
@@ -57,39 +57,6 @@ If there is **insufficient evidence**, specify exactly what is missing and sugge
 
 This report must be **direct and definitive**—avoid speculation and provide a final, actionable determination of the suspect's identity.
 """
-      
-        # Final prompt for the LLM
-        analysis_prompt = f"""
-Analyze the collected evidence in the Gotham Central Bank case:
-
-{evidence_summary}
-
-Based on this evidence:
-1. What connections exist between the different modalities?
-2. What are the suspect's behavioral patterns?
-3. What conclusions can we draw about the criminal's identity?
-"""
-
-
-        prompt = f"""
-You are a forensic detective specialized in analyzing multimodal evidence. Your objective is to analyze different types of evidence (audio, images, texts, depth maps) and identify patterns and connections to determine the **prime suspect**.
-
----
-
-### **Collected Evidence:**
-{evidence_summary}
-
-### **Task:**
-1. **Analyze the evidence** and identify patterns or connections.
-2. **Determine the prime suspect** based on the available clues.
-3. **Justify your conclusion**, explaining why this suspect is the most likely.
-4. **Assign a confidence score (0-100%)**, indicating the certainty of the conclusion.
-
----
-
-If there is **insufficient evidence**, specify what additional information would be needed for a more accurate conclusion.
-"""
-
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",

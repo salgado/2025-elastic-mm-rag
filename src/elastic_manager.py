@@ -10,13 +10,13 @@ class ElasticsearchManager:
     def __init__(self):
         load_dotenv()  # Load variables from .env
         self.es = self._connect_elastic()
-        self.index_name = "multimodal_content1"
+        self.index_name = "multimodal_content"
         self._setup_index()
     
     def _connect_elastic(self):
         """Connects to Elasticsearch"""
         return Elasticsearch(
-            cloud_id=os.getenv("ELASTIC_CLOUD_ID"),
+            os.getenv("ELASTICSEARCH_ENDPOINT"),  # Elasticsearch endpoint
             api_key=os.getenv("ELASTIC_API_KEY")
         )
     

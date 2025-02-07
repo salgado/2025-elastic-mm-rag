@@ -70,7 +70,7 @@ try:
         raise ValueError("Failed to generate forensic report")
         
 except Exception as e:
-    logger.error(f"❌ Error in analysis test: {str(e)}")
+    logger.error(f"❌ Error in analysis : {str(e)}")
 
 
     # # Test cross-modal analysis
