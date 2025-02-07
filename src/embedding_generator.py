@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class EmbeddingGenerator:
-    """Gera embeddings multimodais usando ImageBind"""
+    """Generates multimodal embeddings using ImageBind"""
     
     def __init__(self, device="cpu"):
         self.device = device
@@ -29,19 +29,18 @@ class EmbeddingGenerator:
         os.makedirs(os.path.expanduser("~/.cache/torch/checkpoints"), exist_ok=True)
 
         if not os.path.exists(os.path.expanduser(checkpoint_path)):
-            print("Baixando pesos do ImageBind...")
+            print("Downloading ImageBind weights...")
             download_url_to_file(
                 "https://dl.fbaipublicfiles.com/imagebind/imagebind_huge.pth",
                 os.path.expanduser(checkpoint_path)
             )
             
         try:
-            
             checkpoint_path = os.path.expanduser("~/.cache/torch/checkpoints/imagebind_huge.pth")
         
-            # Verifique se o arquivo existe
+            # Check if file exists
             if not os.path.exists(checkpoint_path):
-                raise FileNotFoundError(f"Checkpoint não encontrado: {checkpoint_path}")
+                raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
                 
             model = imagebind_model.imagebind_huge(pretrained=False)
             model.load_state_dict(torch.load(checkpoint_path))
@@ -62,28 +61,9 @@ class EmbeddingGenerator:
         except Exception as e:
             logger.error(f"🚨 Model initialization failed: {str(e)}")
             raise
-
-    
-    def generate_embedding_old(self, input_data, modality):
-        """Gera embedding para diferentes modalidades"""
-        processors = {
-            "vision": self.process_vision,
-            "audio": self.process_audio,
-            "text": self.process_text,
-            "depth": self.process_depth
-        }
-        
-        if modality not in processors:
-            raise ValueError(f"Modalidade não suportada: {modality}")
-            
-        inputs = {modality: processors[modality](input_data)}
-        
-        with torch.no_grad():
-            embedding = self.model(inputs)[modality]
-        return embedding.squeeze(0).cpu().numpy()
     
     def generate_embedding(self, input_data, modality):
-        """Gera embedding para diferentes modalidades"""
+        """Generates embedding for different modalities"""
         processors = {
             "vision": lambda x: data.load_and_transform_vision_data(x, self.device),
             "audio": lambda x: data.load_and_transform_audio_data(x, self.device),
@@ -92,10 +72,14 @@ class EmbeddingGenerator:
         }
         
         try:
-            # Verificação de tipo de entrada
+            # Input type verification
             if not isinstance(input_data, list):
                 raise ValueError(f"Input data must be a list. Received: {type(input_data)}")
                 
+            # Convert input data to a tensor format that the model can process
+            # For images: [batch_size, channels, height, width] 
+            # For audio: [batch_size, channels, time] 
+            # For text: [batch_size, sequence_length]
             inputs = {modality: processors[modality](input_data)}
             with torch.no_grad():
                 embedding = self.model(inputs)[modality]
@@ -106,27 +90,27 @@ class EmbeddingGenerator:
     
 
     def process_vision(self, image_path):
-        """Processa imagem"""
+        """Processes image"""
         return data.load_and_transform_vision_data([image_path], self.device)
     
     def process_audio(self, audio_path):
-        """Processa áudio"""
+        """Processes audio"""
         return data.load_and_transform_audio_data([audio_path], self.device)
     
     def process_text(self, text):
-        """Processa texto"""
+        """Processes text"""
         return data.load_and_transform_text([text], self.device)
     
     def process_depth(self, depth_paths, device="cpu"):
-        """Processamento customizado para depth maps"""
+        """Custom processing for depth maps"""
         try:
-            print("p1:",depth_paths)
-            # Verificar existencia dos arquivos
+            print("p1:", depth_paths)
+            # Check file existence
             for path in depth_paths:
                 if not os.path.exists(path):
-                    raise FileNotFoundError(f"Arquivo de depth map não encontrado: {path}")
+                    raise FileNotFoundError(f"Depth map file not found: {path}")
             
-            # Carregar e transformar
+            # Load and transform
             depth_images = [Image.open(path).convert("L") for path in depth_paths]
             
             transform = transforms.Compose([
@@ -137,5 +121,5 @@ class EmbeddingGenerator:
             return torch.stack([transform(img) for img in depth_images]).to(device)
             
         except Exception as e:
-            logger.error(f"🚨 Erro no processamento de depth map: {str(e)}")
+            logger.error(f"🚨 Error processing depth map: {str(e)}")
             raise

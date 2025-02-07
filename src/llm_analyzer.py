@@ -28,30 +28,67 @@ class LLMAnalyzer:
         """
         # Format evidence for the prompt
         evidence_summary = self._format_evidence(evidence_results)
-        
-        prompt = f"""You are a forensic detective specialized in analyzing multimodal evidence in the Gotham City crime case.
 
-COLLECTED EVIDENCE:
+        # final prompt
+        prompt_01 = f"""
+You are a highly experienced forensic detective specializing in multimodal evidence analysis. Your task is to analyze the collected evidence (audio, images, text, depth maps) and conclusively determine the **prime suspect** responsible for the Gotham Central Bank case.
+
+---
+
+### **Collected Evidence:**
 {evidence_summary}
 
-Please analyze the evidence above and provide:
+### **Task:**
+1. **Analyze all the evidence** and identify cross-modal connections.
+2. **Determine the exact identity of the criminal** based on behavioral patterns, visual/auditory/textual clues, and symbolic markers.
+3. **Justify your conclusion** by explaining why this suspect is definitively responsible.
+4. **Assign a confidence score (0-100%)** to your conclusion.
 
-1. IDENTIFIED PATTERNS:
-- Connections between different types of evidence
-- Relevant temporal or spatial patterns
-- Distinctive characteristics of the suspect
+---
 
-2. PROBABLE SUSPECT:
-- Identity of the main suspect
-- Confidence level in identification (0-100%)
-- Justification for identification
+### **Final Output Format (Strictly Follow This Format):**
+- **Prime Suspect:** [Full Name or Alias]
+- **Evidence Supporting Conclusion:** [Detailed breakdown of visual, auditory, textual, and behavioral evidence]
+- **Behavioral Patterns:** [Key actions, motives, and criminal signature]
+- **Confidence Level:** [0-100%]
+- **Next Steps (if any):** [What additional evidence would further confirm the identity? If none, state "No further evidence required."]
 
-3. NEXT STEPS:
-- Investigation recommendations
-- Additional evidence needed
-- Areas requiring further investigation
+If there is **insufficient evidence**, specify exactly what is missing and suggest what additional data would be needed for a conclusive identification.
 
-Format the report clearly and professionally."""
+This report must be **direct and definitive**—avoid speculation and provide a final, actionable determination of the suspect's identity.
+"""
+      
+        # Final prompt for the LLM
+        analysis_prompt = f"""
+Analyze the collected evidence in the Gotham Central Bank case:
+
+{evidence_summary}
+
+Based on this evidence:
+1. What connections exist between the different modalities?
+2. What are the suspect's behavioral patterns?
+3. What conclusions can we draw about the criminal's identity?
+"""
+
+
+        prompt = f"""
+You are a forensic detective specialized in analyzing multimodal evidence. Your objective is to analyze different types of evidence (audio, images, texts, depth maps) and identify patterns and connections to determine the **prime suspect**.
+
+---
+
+### **Collected Evidence:**
+{evidence_summary}
+
+### **Task:**
+1. **Analyze the evidence** and identify patterns or connections.
+2. **Determine the prime suspect** based on the available clues.
+3. **Justify your conclusion**, explaining why this suspect is the most likely.
+4. **Assign a confidence score (0-100%)**, indicating the certainty of the conclusion.
+
+---
+
+If there is **insufficient evidence**, specify what additional information would be needed for a more accurate conclusion.
+"""
 
         try:
             response = self.client.chat.completions.create(
@@ -61,9 +98,9 @@ Format the report clearly and professionally."""
                         "role": "system",
                         "content": "You are a forensic detective specialized in multimodal evidence analysis."
                     },
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt_01}
                 ],
-                temperature=0.7,
+                temperature=0.2,
                 max_tokens=1000
             )
             
@@ -106,7 +143,9 @@ Please identify:
 1. Direct connections between the evidence
 2. Patterns suggesting the same suspect
 3. Inconsistencies or contradictions
-4. Correlation strength (0-100%)"""
+4. Correlation strength (0-100%)
+
+"""
 
         try:
             response = self.client.chat.completions.create(

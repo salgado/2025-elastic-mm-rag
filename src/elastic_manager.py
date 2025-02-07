@@ -4,24 +4,24 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 
-class ElasticManager:
-    """Gerencia operações multimodais no Elasticsearch"""
+class ElasticsearchManager:
+    """Manages multimodal operations in Elasticsearch"""
     
     def __init__(self):
-        load_dotenv()  # Carrega variáveis do .env
+        load_dotenv()  # Load variables from .env
         self.es = self._connect_elastic()
-        self.index_name = "multimodal_content"
+        self.index_name = "multimodal_content1"
         self._setup_index()
     
     def _connect_elastic(self):
-        """Conecta ao Elasticsearch"""
+        """Connects to Elasticsearch"""
         return Elasticsearch(
             cloud_id=os.getenv("ELASTIC_CLOUD_ID"),
             api_key=os.getenv("ELASTIC_API_KEY")
         )
     
     def _setup_index(self):
-        """Configura o índice se não existir"""
+        """Sets up the index if it doesn't exist"""
         if not self.es.indices.exists(index=self.index_name):
             mapping = {
                 "mappings": {
@@ -43,7 +43,7 @@ class ElasticManager:
             self.es.indices.create(index=self.index_name, body=mapping)
     
     def index_content(self, embedding, modality, content=None, description="", metadata=None, content_path=None):
-        """Indexa conteúdo multimodal"""
+        """Indexes multimodal content"""
         doc = {
             "embedding": embedding.tolist(),
             "modality": modality,
@@ -58,7 +58,7 @@ class ElasticManager:
         return self.es.index(index=self.index_name, document=doc)
     
     def search_similar(self, query_embedding, modality=None, k=5):
-        """Busca conteúdos similares"""
+        """Searches for similar contents"""
         query = {
             "knn": {
                 "field": "embedding",
@@ -69,11 +69,19 @@ class ElasticManager:
             }
         }
         
-        response = self.es.search(
-            index=self.index_name,
-            query=query,
-            size=k,
-            _source=["content_path", "modality", "description", "metadata"]
-        )
+        try:
+            response = self.es.search(
+                index=self.index_name,
+                query=query,
+                size=k            
+            )
+            
+            # Return both source data and score for each hit
+            return [{
+                **hit["_source"],
+                "score": hit["_score"]
+            } for hit in response["hits"]["hits"]]
         
-        return [hit["_source"] for hit in response["hits"]["hits"]]
+        except Exception as e:
+            print(f"Error processing search_evidence: {str(e)}")
+            return "Error generating search evidence"
