@@ -83,5 +83,5 @@ class ElasticsearchManager:
             } for hit in response["hits"]["hits"]]
         
         except Exception as e:
-            print(f"Error processing search_evidence: {str(e)}")
+            print(f"Error: processing search_evidence: {str(e)}")
             return "Error generating search evidence"

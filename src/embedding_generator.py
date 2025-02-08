@@ -46,10 +46,6 @@ class EmbeddingGenerator:
             model.load_state_dict(torch.load(checkpoint_path))
             model.eval().to(self.device)
             
-            # model = imagebind_model.imagebind_huge(pretrained=True)
-            # model.eval()
-            # model.to(self.device)
-
             # Quick test with empty text input
             logger.info("Testing model with sample input...")
             test_input = data.load_and_transform_text([""], self.device)
@@ -104,7 +100,6 @@ class EmbeddingGenerator:
     def process_depth(self, depth_paths, device="cpu"):
         """Custom processing for depth maps"""
         try:
-            print("p1:", depth_paths)
             # Check file existence
             for path in depth_paths:
                 if not os.path.exists(path):
@@ -121,5 +116,5 @@ class EmbeddingGenerator:
             return torch.stack([transform(img) for img in depth_images]).to(device)
             
         except Exception as e:
-            logger.error(f"🚨 Error processing depth map: {str(e)}")
+            logger.error(f"🚨 - Error processing depth map: {str(e)}")
             raise

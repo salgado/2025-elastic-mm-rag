@@ -65,7 +65,7 @@ This report must be **direct and definitive**—avoid speculation and provide a 
                         "role": "system",
                         "content": "You are a forensic detective specialized in multimodal evidence analysis."
                     },
-                    {"role": "user", "content": prompt_01}
+                    {"role": "user", "content": prompt}
                 ],
                 temperature=0.2,
                 max_tokens=1000
@@ -135,5 +135,5 @@ Please identify:
             return analysis
             
         except Exception as e:
-            logger.error(f"Error in cross-modal analysis: {str(e)}")
+            logger.error(f"Error: in cross-modal analysis: {str(e)}")
             return None
